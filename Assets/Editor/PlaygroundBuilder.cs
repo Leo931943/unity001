@@ -37,7 +37,7 @@ public static class PlaygroundBuilder
         CreateMaterials();
         AnimationClip idleClip = CreateIdleAnimationClip();
         AnimationClip jumpClip = CreateJumpAnimationClip();
-        AnimationClip runningClip = GetFbxRunningClip();
+        AnimationClip runningClip = CreateNaturalRunAnimationClip();
         AnimatorController animController = CreateAnimatorController(idleClip, runningClip, jumpClip);
 
         // Create new empty scene
@@ -122,11 +122,11 @@ public static class PlaygroundBuilder
     private static void CreatePhysicsMaterials()
     {
         soccerBallPhysMat = new PhysicsMaterial("SoccerBallPhysicsMaterial");
-        soccerBallPhysMat.bounciness = 0.75f;
-        soccerBallPhysMat.dynamicFriction = 0.4f;
-        soccerBallPhysMat.staticFriction = 0.4f;
-        soccerBallPhysMat.bounceCombine = PhysicsMaterialCombine.Maximum;
-        soccerBallPhysMat.frictionCombine = PhysicsMaterialCombine.Minimum;
+        soccerBallPhysMat.bounciness = 0.28f;
+        soccerBallPhysMat.dynamicFriction = 0.65f;
+        soccerBallPhysMat.staticFriction = 0.65f;
+        soccerBallPhysMat.bounceCombine = PhysicsMaterialCombine.Average;
+        soccerBallPhysMat.frictionCombine = PhysicsMaterialCombine.Average;
         AssetDatabase.CreateAsset(soccerBallPhysMat, "Assets/Materials/SoccerBallPhysicsMaterial.physicMaterial");
     }
 
@@ -275,53 +275,31 @@ public static class PlaygroundBuilder
         clip.frameRate = 30;
         clip.wrapMode = WrapMode.Loop;
 
-        float duration = 2.0f;
-        float hipHeight = 0.95f;
+        const float duration = 2.0f;
 
-        // 1. Root Motion (Hips height) - Prevents sinking into ground!
-        Keyframe[] rootYKeys = new Keyframe[]
-        {
-            new Keyframe(0f, hipHeight),
-            new Keyframe(duration * 0.5f, hipHeight + 0.012f),
-            new Keyframe(duration, hipHeight)
-        };
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "RootT.y"), new AnimationCurve(rootYKeys));
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "RootT.x"), AnimationCurve.Constant(0f, duration, 0f));
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "RootT.z"), AnimationCurve.Constant(0f, duration, 0f));
+        // 1. 下半身：直立站姿，膝蓋伸直不彎曲（徹底解決跪姿問題）
+        SetMuscleConstant(clip, "Left Upper Leg Front-Back", duration, 0.0f);
+        SetMuscleConstant(clip, "Right Upper Leg Front-Back", duration, 0.0f);
+        SetMuscleConstant(clip, "Left Upper Leg In-Out", duration, 0.0f);
+        SetMuscleConstant(clip, "Right Upper Leg In-Out", duration, 0.0f);
+        SetMuscleConstant(clip, "Left Lower Leg Stretch", duration, 0.0f);
+        SetMuscleConstant(clip, "Right Lower Leg Stretch", duration, 0.0f);
+        SetMuscleConstant(clip, "Left Foot Up-Down", duration, 0.0f);
+        SetMuscleConstant(clip, "Right Foot Up-Down", duration, 0.0f);
 
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "RootQ.x"), AnimationCurve.Constant(0f, duration, 0f));
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "RootQ.y"), AnimationCurve.Constant(0f, duration, 0f));
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "RootQ.z"), AnimationCurve.Constant(0f, duration, 0f));
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "RootQ.w"), AnimationCurve.Constant(0f, duration, 1f));
+        // 2. 上半身：雙手自然垂放於身體大腿兩側（徹底解決雙手擺在胸前問題）
+        SetMuscleCurve(clip, "Left Arm Down-Up", duration, -0.74f, -0.72f, -0.74f);
+        SetMuscleCurve(clip, "Right Arm Down-Up", duration, -0.74f, -0.72f, -0.74f);
+        SetMuscleConstant(clip, "Left Arm Front-Back", duration, -0.06f);
+        SetMuscleConstant(clip, "Right Arm Front-Back", duration, -0.06f);
+        SetMuscleConstant(clip, "Left Arm In-Out", duration, 0.06f);
+        SetMuscleConstant(clip, "Right Arm In-Out", duration, 0.06f);
+        SetMuscleConstant(clip, "Left Forearm Stretch", duration, 0.0f);
+        SetMuscleConstant(clip, "Right Forearm Stretch", duration, 0.0f);
 
-        // 2. Arms & Hands naturally resting at sides of thighs (手放在大腿兩側)
-        for (int i = 0; i < HumanTrait.MuscleCount; i++)
-        {
-            string muscle = HumanTrait.MuscleName[i];
-            float val = 0f;
-
-            if (muscle == "Left Arm Down-Up" || muscle == "Right Arm Down-Up")
-                val = -0.72f; // Drops arms down to the sides
-            else if (muscle == "Left Arm Front-Back" || muscle == "Right Arm Front-Back")
-                val = -0.22f; // Pulls arms back to align with pant seams (not in front)
-            else if (muscle == "Left Arm In-Out" || muscle == "Right Arm In-Out")
-                val = 0.08f; // Clears torso so hands rest right against outer thighs
-            else if (muscle == "Left Forearm Stretch" || muscle == "Right Forearm Stretch")
-                val = -0.05f; // Relaxes elbows straight down
-            else if (muscle == "Spine Front-Back")
-            {
-                Keyframe[] spineKeys = new Keyframe[]
-                {
-                    new Keyframe(0f, 0.02f),
-                    new Keyframe(duration * 0.5f, 0.05f),
-                    new Keyframe(duration, 0.02f)
-                };
-                AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), muscle), new AnimationCurve(spineKeys));
-                continue;
-            }
-
-            AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), muscle), AnimationCurve.Constant(0f, duration, val));
-        }
+        // 3. 脊椎微幅呼吸起伏
+        SetMuscleCurve(clip, "Spine Front-Back", duration, 0.0f, 0.02f, 0.0f);
+        SetMuscleCurve(clip, "Chest Front-Back", duration, 0.0f, 0.015f, 0.0f);
 
         AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
         settings.loopTime = true;
@@ -332,28 +310,90 @@ public static class PlaygroundBuilder
         return clip;
     }
 
+    private static void SetMuscleConstant(AnimationClip clip, string muscle, float duration, float value)
+    {
+        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), muscle), AnimationCurve.Constant(0f, duration, value));
+    }
+
     private static AnimationClip CreateJumpAnimationClip()
     {
         AnimationClip clip = new AnimationClip();
         clip.name = "Jump";
+        clip.frameRate = 30;
         clip.wrapMode = WrapMode.ClampForever;
 
-        // Jump pose: legs slightly tucked, arms raised for balance
-        Keyframe[] armKeys = new Keyframe[] { new Keyframe(0f, 0.1f), new Keyframe(1.0f, 0.1f) };
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "Left Arm Down-Up"), new AnimationCurve(armKeys));
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "Right Arm Down-Up"), new AnimationCurve(armKeys));
+        const float duration = 0.7f;
 
-        Keyframe[] legKeys = new Keyframe[] { new Keyframe(0f, 0.35f), new Keyframe(1.0f, 0.35f) };
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "Left Upper Leg Front-Back"), new AnimationCurve(legKeys));
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "Right Upper Leg Front-Back"), new AnimationCurve(legKeys));
+        // 雙臂起跳強力向上揮動，隨後在空中張開保持平衡，降落前收回
+        SetMuscleCurve(clip, "Left Arm Down-Up", duration, -0.72f, 0.10f, -0.15f, -0.50f, -0.70f);
+        SetMuscleCurve(clip, "Right Arm Down-Up", duration, -0.72f, 0.10f, -0.15f, -0.50f, -0.70f);
+        SetMuscleCurve(clip, "Left Arm Front-Back", duration, -0.05f, 0.25f, 0.15f, 0.05f, -0.05f);
+        SetMuscleCurve(clip, "Right Arm Front-Back", duration, -0.05f, 0.25f, 0.15f, 0.05f, -0.05f);
+        SetMuscleCurve(clip, "Left Arm In-Out", duration, 0.06f, 0.20f, 0.25f, 0.15f, 0.06f);
+        SetMuscleCurve(clip, "Right Arm In-Out", duration, 0.06f, 0.20f, 0.25f, 0.15f, 0.06f);
+        SetMuscleCurve(clip, "Left Forearm Stretch", duration, 0.0f, -0.25f, -0.35f, -0.15f, 0.0f);
+        SetMuscleCurve(clip, "Right Forearm Stretch", duration, 0.0f, -0.25f, -0.35f, -0.15f, 0.0f);
 
-        Keyframe[] kneeKeys = new Keyframe[] { new Keyframe(0f, -0.4f), new Keyframe(1.0f, -0.4f) };
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "Left Lower Leg Stretch"), new AnimationCurve(kneeKeys));
-        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), "Right Lower Leg Stretch"), new AnimationCurve(kneeKeys));
+        // 下肢：起跳蹬地 -> 空中屈膝收腿 -> 下落伸展準備接觸地面
+        SetMuscleCurve(clip, "Left Lower Leg Stretch", duration, 0.0f, -0.20f, -0.38f, -0.15f, 0.0f);
+        SetMuscleCurve(clip, "Right Lower Leg Stretch", duration, 0.0f, -0.20f, -0.38f, -0.15f, 0.0f);
+        SetMuscleCurve(clip, "Left Upper Leg Front-Back", duration, 0.0f, 0.15f, 0.12f, 0.05f, 0.0f);
+        SetMuscleCurve(clip, "Right Upper Leg Front-Back", duration, 0.0f, 0.15f, 0.12f, 0.05f, 0.0f);
+        SetMuscleCurve(clip, "Left Foot Up-Down", duration, 0.0f, -0.25f, -0.35f, -0.10f, 0.0f);
+        SetMuscleCurve(clip, "Right Foot Up-Down", duration, 0.0f, -0.25f, -0.35f, -0.10f, 0.0f);
+
+        // 軀幹展胸
+        SetMuscleCurve(clip, "Spine Front-Back", duration, 0.0f, 0.05f, 0.08f, 0.03f, 0.0f);
+
+        AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
+        settings.loopTime = false;
+        AnimationUtility.SetAnimationClipSettings(clip, settings);
 
         string path = "Assets/Character/Meshy_Character/Jump.anim";
         AssetDatabase.CreateAsset(clip, path);
         return clip;
+    }
+
+    private static AnimationClip CreateNaturalRunAnimationClip()
+    {
+        const float duration = 0.8f;
+        const string path = "Assets/Character/Meshy_Character/NaturalRun.anim";
+        AnimationClip clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+        if (clip == null)
+        {
+            clip = new AnimationClip();
+            AssetDatabase.CreateAsset(clip, path);
+        }
+
+        clip.ClearCurves();
+        clip.name = "NaturalRun";
+        clip.frameRate = 30;
+        clip.wrapMode = WrapMode.Loop;
+
+        // Opposite arms and legs make a compact, upright running cycle.
+        SetMuscleCurve(clip, "Left Upper Leg Front-Back", duration, 0.30f, -0.30f, 0.30f, -0.30f, 0.30f);
+        SetMuscleCurve(clip, "Right Upper Leg Front-Back", duration, -0.30f, 0.30f, -0.30f, 0.30f, -0.30f);
+        SetMuscleCurve(clip, "Left Lower Leg Stretch", duration, -0.04f, -0.22f, -0.04f, -0.22f, -0.04f);
+        SetMuscleCurve(clip, "Right Lower Leg Stretch", duration, -0.22f, -0.04f, -0.22f, -0.04f, -0.22f);
+        SetMuscleCurve(clip, "Left Arm Down-Up", duration, -0.62f, -0.56f, -0.62f, -0.68f, -0.62f);
+        SetMuscleCurve(clip, "Right Arm Down-Up", duration, -0.62f, -0.68f, -0.62f, -0.56f, -0.62f);
+        SetMuscleCurve(clip, "Left Arm Front-Back", duration, -0.20f, 0.20f, -0.20f, 0.20f, -0.20f);
+        SetMuscleCurve(clip, "Right Arm Front-Back", duration, 0.20f, -0.20f, 0.20f, -0.20f, 0.20f);
+        SetMuscleCurve(clip, "Spine Left-Right", duration, 0.02f, -0.02f, 0.02f, -0.02f, 0.02f);
+
+        AnimationClipSettings settings = AnimationUtility.GetAnimationClipSettings(clip);
+        settings.loopTime = true;
+        AnimationUtility.SetAnimationClipSettings(clip, settings);
+        EditorUtility.SetDirty(clip);
+        return clip;
+    }
+
+    private static void SetMuscleCurve(AnimationClip clip, string muscle, float duration, params float[] values)
+    {
+        Keyframe[] keys = new Keyframe[values.Length];
+        for (int i = 0; i < values.Length; i++)
+            keys[i] = new Keyframe(duration * i / (values.Length - 1), values[i]);
+        AnimationUtility.SetEditorCurve(clip, EditorCurveBinding.FloatCurve("", typeof(Animator), muscle), new AnimationCurve(keys));
     }
 
     private static AnimationClip GetFbxRunningClip()
@@ -393,10 +433,14 @@ public static class PlaygroundBuilder
         AnimatorState stateWalk = rootSM.AddState("Walk");
         stateWalk.motion = runClip != null ? runClip : idleClip;
         stateWalk.speed = 0.55f;
+        stateWalk.speedParameterActive = true;
+        stateWalk.speedParameter = "MotionSpeed";
 
         AnimatorState stateRun = rootSM.AddState("Run");
         stateRun.motion = runClip != null ? runClip : idleClip;
         stateRun.speed = 1.0f;
+        stateRun.speedParameterActive = true;
+        stateRun.speedParameter = "MotionSpeed";
 
         AnimatorState stateJump = rootSM.AddState("Jump");
         stateJump.motion = jumpClip;
@@ -434,13 +478,24 @@ public static class PlaygroundBuilder
         var anyToJump = rootSM.AddAnyStateTransition(stateJump);
         anyToJump.hasExitTime = false;
         anyToJump.duration = 0.1f;
+        anyToJump.canTransitionToSelf = false;
         anyToJump.AddCondition(AnimatorConditionMode.If, 0, "IsJumping");
 
-        // Jump -> Idle
+        // Jump -> Idle (落地且靜止)
         var jumpToIdle = stateJump.AddTransition(stateIdle);
         jumpToIdle.hasExitTime = false;
-        jumpToIdle.duration = 0.15f;
+        jumpToIdle.duration = 0.12f;
+        jumpToIdle.canTransitionToSelf = false;
         jumpToIdle.AddCondition(AnimatorConditionMode.If, 0, "IsGrounded");
+        jumpToIdle.AddCondition(AnimatorConditionMode.Less, 0.15f, "Speed");
+
+        // Jump -> Walk (落地且仍在移動)
+        var jumpToWalk = stateJump.AddTransition(stateWalk);
+        jumpToWalk.hasExitTime = false;
+        jumpToWalk.duration = 0.12f;
+        jumpToWalk.canTransitionToSelf = false;
+        jumpToWalk.AddCondition(AnimatorConditionMode.If, 0, "IsGrounded");
+        jumpToWalk.AddCondition(AnimatorConditionMode.Greater, 0.15f, "Speed");
 
         AssetDatabase.SaveAssets();
         return controller;
@@ -751,8 +806,8 @@ public static class PlaygroundBuilder
 
         Rigidbody rb = ball.AddComponent<Rigidbody>();
         rb.mass = 0.45f;
-        rb.linearDamping = 0.4f;
-        rb.angularDamping = 0.6f;
+        rb.linearDamping = 1.1f;
+        rb.angularDamping = 0.8f;
         rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
     }
 
@@ -918,7 +973,7 @@ public static class PlaygroundBuilder
     private static GameObject BuildPlayerCharacter(AnimatorController animController)
     {
         GameObject player = new GameObject("Player");
-        player.transform.position = new Vector3(0, 1.2f, 0); // Center spot
+        player.transform.position = new Vector3(0, 0.02f, -8f); // Away from centre-ball spawn
         player.transform.rotation = Quaternion.identity;
 
         // CharacterController
@@ -935,7 +990,7 @@ public static class PlaygroundBuilder
         pc.walkSpeed = 4.0f;
         pc.runSpeed = 8.5f;
         pc.jumpVelocity = 6.5f;
-        pc.kickForce = 8.5f;
+        pc.kickForce = 1.4f;
 
         // Instantiate Meshy 3D Model
         string fbxPath = "Assets/Character/Meshy_Character/Meshy_AI_Neutral_Studio_Stance_biped_Animation_Running_withSkin.fbx";
@@ -944,7 +999,7 @@ public static class PlaygroundBuilder
         {
             GameObject modelInstance = Object.Instantiate(modelPrefab, player.transform);
             modelInstance.name = "Meshy_Model";
-            modelInstance.transform.localPosition = Vector3.zero;
+            modelInstance.transform.localPosition = new Vector3(0f, 1.05f, 0f);
             modelInstance.transform.localRotation = Quaternion.identity;
 
             // Apply Character Material
@@ -960,6 +1015,7 @@ public static class PlaygroundBuilder
                 anim = modelInstance.AddComponent<Animator>();
 
             anim.runtimeAnimatorController = animController;
+            anim.applyRootMotion = false;
             pc.animator = anim;
         }
         else

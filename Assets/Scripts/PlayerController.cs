@@ -6,6 +6,10 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
+    private static readonly Vector3 SpawnPosition = new Vector3(0f, 0.02f, -8f);
+    [Header("Model Alignment")]
+    [Tooltip("Visual offset for model to match ground plane")]
+    public Vector3 modelOffset = Vector3.zero;
     [Header("Movement Speeds")]
     [Tooltip("Walking speed in m/s")]
     public float walkSpeed = 4.0f;
@@ -26,8 +30,10 @@ public class PlayerController : MonoBehaviour
     public float airControl = 0.6f;
 
     [Header("Soccer Ball Physics Interaction")]
-    [Tooltip("Force applied to soccer ball when kicking")]
-    public float kickForce = 7.0f;
+    [Tooltip("Maximum one-touch impulse applied to the soccer ball")]
+    [Min(0f)] public float kickForce = 1.4f;
+    [Tooltip("Minimum delay between touches of the same ball")]
+    [Min(0.01f)] public float ballTouchCooldown = 0.12f;
 
     [Header("References")]
     public Transform cameraTransform;
@@ -40,6 +46,9 @@ public class PlayerController : MonoBehaviour
     private float verticalVelocity;
     private bool isGrounded;
     private bool jumpRequested;
+    private bool isJumping;
+    private Rigidbody lastTouchedBall;
+    private float lastBallTouchTime;
 
     // Status properties for HUD
     public float CurrentSpeed => currentSpeed;
@@ -59,6 +68,21 @@ public class PlayerController : MonoBehaviour
 
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
+
+        // Movement is controlled by CharacterController.  Letting a humanoid
+        // clip also apply root motion offsets the visible mesh and made it sink
+        // into the pitch while idle.
+        if (animator != null)
+            animator.applyRootMotion = false;
+
+        // The CharacterController's origin sits at ground level, while this FBX
+        // is authored around the hips.  Keep the rendered mesh above that origin
+        // so only its feet, rather than its torso, meet the pitch.
+        Transform model = transform.Find("Meshy_Model");
+        if (model != null)
+        {
+            model.localPosition = modelOffset;
+        }
 
         if (cameraTransform == null && Camera.main != null)
             cameraTransform = Camera.main.transform;
@@ -87,6 +111,7 @@ public class PlayerController : MonoBehaviour
         if (isGrounded && verticalVelocity < 0)
         {
             verticalVelocity = -2f; // Small downward velocity to keep stick to slopes
+            isJumping = false;
         }
 
         // Smooth speed transition
@@ -118,6 +143,7 @@ public class PlayerController : MonoBehaviour
         {
             verticalVelocity = jumpVelocity;
             jumpRequested = false;
+            isJumping = true;
         }
 
         // Apply gravity
@@ -138,7 +164,7 @@ public class PlayerController : MonoBehaviour
         // Pass Speed and Ground state
         animator.SetFloat("Speed", currentSpeed);
         animator.SetBool("IsGrounded", isGrounded);
-        animator.SetBool("IsJumping", !isGrounded && verticalVelocity > 0.5f);
+        animator.SetBool("IsJumping", isJumping || (!isGrounded && verticalVelocity > 1.0f));
         animator.SetFloat("VerticalVelocity", verticalVelocity);
 
         // Adjust animation playback speed for walk vs run
@@ -187,22 +213,40 @@ public class PlayerController : MonoBehaviour
     public void ResetPosition()
     {
         controller.enabled = false;
-        transform.position = new Vector3(0, 1.2f, 0); // Soccer field center
+        transform.position = SpawnPosition;
         transform.rotation = Quaternion.identity;
         verticalVelocity = 0;
         currentSpeed = 0;
+        isJumping = false;
         controller.enabled = true;
     }
 
     void OnControllerColliderHit(ControllerColliderHit hit)
     {
-        // Interactive soccer ball kicking
+        // CharacterController contacts are reported every frame.  Applying a full
+        // impulse on each report made the ball accelerate unrealistically fast.
         Rigidbody rb = hit.collider.attachedRigidbody;
-        if (rb != null && !rb.isKinematic)
+        if (rb == null || rb.isKinematic || currentSpeed < 0.2f)
+            return;
+
+        if (rb == lastTouchedBall && Time.time < lastBallTouchTime + ballTouchCooldown)
+            return;
+
+        Vector3 planarMove = new Vector3(hit.moveDirection.x, 0f, hit.moveDirection.z);
+        if (planarMove.sqrMagnitude < 0.0001f)
+            return;
+
+        float speedFactor = Mathf.Clamp01(currentSpeed / Mathf.Max(0.01f, runSpeed));
+        Vector3 pushDir = (planarMove.normalized + Vector3.up * 0.08f).normalized;
+        float impulse = Mathf.Lerp(0.45f, Mathf.Min(kickForce, 1.8f), speedFactor);
+
+        rb.AddForce(pushDir * impulse, ForceMode.Impulse);
+        if (rb.linearVelocity.magnitude > 12f)
         {
-            Vector3 pushDir = new Vector3(hit.moveDirection.x, 0.25f, hit.moveDirection.z).normalized;
-            float force = kickForce * Mathf.Max(1.0f, currentSpeed / 2.0f);
-            rb.AddForce(pushDir * force, ForceMode.Impulse);
+            rb.linearVelocity = rb.linearVelocity.normalized * 12f;
         }
+
+        lastTouchedBall = rb;
+        lastBallTouchTime = Time.time;
     }
 }

@@ -27,16 +27,24 @@ public static class AutoOpenScene
         }
     }
 
-    [MenuItem("Playground/2. Fix Idle Pose & Hands (修正靜止沉地與手部位置)", false, 2)]
+    [MenuItem("Playground/2. Fix Character Animation (修正待機、跑步與跳躍)", false, 2)]
     public static void TriggerFixIdle()
     {
         FixIdleAnimation.Run();
     }
 
+    [MenuItem("Playground/3. Setup New Casual Character (安裝新角色與動畫)", false, 3)]
+    public static void TriggerSetupNewCharacter()
+    {
+        SetupNewCharacter.Run();
+    }
+
     private static void RunAutoSetup()
     {
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
         EnsurePlaygroundSceneLoaded();
         FixIdleAnimation.Run();
+        SetupNewCharacter.Run();
     }
 
     private static void EnsurePlaygroundSceneLoaded()
