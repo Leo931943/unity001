@@ -188,7 +188,7 @@ public static class SetupNewCharacter
                 string lower = c.name.ToLower();
                 Debug.Log($"[SetupNewCharacter] 掃描到動畫剪輯: '{c.name}' (長度: {c.length:F2}s, isLooping: {c.isLooping})");
                 if (lower.Contains("run") && runClip == null) runClip = c;
-                else if (lower.Contains("walk") && walkClip == null) walkClip = c;
+                else if ((c.name == "Walking" || (lower.Contains("walk") && !lower.Contains("casual"))) && walkClip == null) walkClip = c;
                 else if (lower.Contains("idle") && idleClip == null) idleClip = c;
             }
         }
@@ -196,9 +196,10 @@ public static class SetupNewCharacter
         // 如果只有一個 runClip，walk 也通用
         if (walkClip == null) walkClip = runClip;
 
-        // 使用直立待機 Idle.anim (已設定 RootT.y 保持站立高度)
-        if (idleClip == null)
-            idleClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Character/Meshy_Character/Idle.anim");
+        // Casual FBX 的 idle/stance 是交叉手微蹲的綁定姿勢，待機一律用直立 Idle.anim
+        AnimationClip standingIdle = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Character/Meshy_Character/Idle.anim");
+        if (standingIdle != null)
+            idleClip = standingIdle;
 
         AnimationClip jumpClip = AssetDatabase.LoadAssetAtPath<AnimationClip>("Assets/Character/Meshy_Character/Jump.anim");
 
@@ -207,10 +208,20 @@ public static class SetupNewCharacter
         {
             foreach (ChildAnimatorState state in controller.layers[0].stateMachine.states)
             {
-                if (state.state.name == "Idle" && idleClip != null) state.state.motion = idleClip;
+                if (state.state.name == "Idle")
+                {
+                    // Freeze the correctly retargeted walk at its passing pose.
+                    // The imported studio reference pose folds this character's
+                    // arms into the body and bends its legs when used as Idle.
+                    state.state.motion = walkClip != null ? walkClip : idleClip;
+                    state.state.speed = 0f;
+                    state.state.cycleOffset = 0f;
+                    state.state.speedParameterActive = false;
+                }
                 else if (state.state.name == "Walk" && walkClip != null)
                 {
                     state.state.motion = walkClip;
+                    state.state.speed = 1.0f;
                     state.state.speedParameterActive = true;
                     state.state.speedParameter = "MotionSpeed";
                 }

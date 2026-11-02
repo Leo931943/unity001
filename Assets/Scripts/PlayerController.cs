@@ -171,7 +171,16 @@ public class PlayerController : MonoBehaviour
         float motionSpeed = 1.0f;
         if (currentSpeed > 0.1f)
         {
-            motionSpeed = Mathf.Lerp(0.5f, 1.25f, currentSpeed / runSpeed);
+            if (IsSprinting)
+            {
+                // Run playback speed remains untouched (1.25x at runSpeed as requested)
+                motionSpeed = Mathf.Lerp(1.0f, 1.25f, Mathf.Clamp01(currentSpeed / Mathf.Max(0.1f, runSpeed)));
+            }
+            else
+            {
+                // Walk playback speed scaled dynamically to eliminate slow/fake foot sliding
+                motionSpeed = Mathf.Lerp(0.85f, 1.35f, Mathf.Clamp01(currentSpeed / Mathf.Max(0.1f, walkSpeed)));
+            }
         }
         animator.SetFloat("MotionSpeed", motionSpeed);
     }

@@ -277,25 +277,26 @@ public static class PlaygroundBuilder
 
         const float duration = 2.0f;
 
-        // 1. 下半身：直立站姿，膝蓋伸直不彎曲（徹底解決跪姿問題）
-        SetMuscleConstant(clip, "Left Upper Leg Front-Back", duration, 0.0f);
-        SetMuscleConstant(clip, "Right Upper Leg Front-Back", duration, 0.0f);
+        // Casual Studio Stance 的肌肉 0 是交叉手微蹲，待機必須用補償值才會真正站直
+        SetMuscleConstant(clip, "Left Upper Leg Front-Back", duration, -0.28f);
+        SetMuscleConstant(clip, "Right Upper Leg Front-Back", duration, -0.28f);
         SetMuscleConstant(clip, "Left Upper Leg In-Out", duration, 0.0f);
         SetMuscleConstant(clip, "Right Upper Leg In-Out", duration, 0.0f);
-        SetMuscleConstant(clip, "Left Lower Leg Stretch", duration, 0.0f);
-        SetMuscleConstant(clip, "Right Lower Leg Stretch", duration, 0.0f);
+        SetMuscleConstant(clip, "Left Lower Leg Stretch", duration, 0.85f);
+        SetMuscleConstant(clip, "Right Lower Leg Stretch", duration, 0.85f);
         SetMuscleConstant(clip, "Left Foot Up-Down", duration, 0.0f);
         SetMuscleConstant(clip, "Right Foot Up-Down", duration, 0.0f);
 
-        // 2. 上半身：雙手自然垂放於身體大腿兩側（徹底解決雙手擺在胸前問題）
-        SetMuscleCurve(clip, "Left Arm Down-Up", duration, -0.74f, -0.72f, -0.74f);
-        SetMuscleCurve(clip, "Right Arm Down-Up", duration, -0.74f, -0.72f, -0.74f);
-        SetMuscleConstant(clip, "Left Arm Front-Back", duration, -0.06f);
-        SetMuscleConstant(clip, "Right Arm Front-Back", duration, -0.06f);
-        SetMuscleConstant(clip, "Left Arm In-Out", duration, 0.06f);
-        SetMuscleConstant(clip, "Right Arm In-Out", duration, 0.06f);
-        SetMuscleConstant(clip, "Left Forearm Stretch", duration, 0.0f);
-        SetMuscleConstant(clip, "Right Forearm Stretch", duration, 0.0f);
+        SetMuscleCurve(clip, "Left Arm Down-Up", duration, -0.4f, -0.38f, -0.4f);
+        SetMuscleCurve(clip, "Right Arm Down-Up", duration, -0.4f, -0.38f, -0.4f);
+        SetMuscleConstant(clip, "Left Arm Front-Back", duration, -0.55f);
+        SetMuscleConstant(clip, "Right Arm Front-Back", duration, -0.55f);
+        SetMuscleConstant(clip, "Left Arm In-Out", duration, 0.32f);
+        SetMuscleConstant(clip, "Right Arm In-Out", duration, 0.32f);
+        SetMuscleConstant(clip, "Left Forearm Stretch", duration, 0.8f);
+        SetMuscleConstant(clip, "Right Forearm Stretch", duration, 0.8f);
+        SetMuscleConstant(clip, "Left Shoulder Front-Back", duration, -0.22f);
+        SetMuscleConstant(clip, "Right Shoulder Front-Back", duration, -0.22f);
 
         // 3. 脊椎微幅呼吸起伏
         SetMuscleCurve(clip, "Spine Front-Back", duration, 0.0f, 0.02f, 0.0f);
